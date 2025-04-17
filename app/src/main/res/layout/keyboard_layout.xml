@@ -1,58 +1,123 @@
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:foreground="@drawable/border"
+    android:background="@color/gray"
     android:orientation="vertical"
-    android:padding="8dp">
+    android:padding="0dp">
 
-    <!-- Progress display -->
+    <HorizontalScrollView
+        android:id="@+id/writtenTextScrollView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:scrollbars="none"
+        android:layout_marginHorizontal="0dp"
+        app:layout_constraintBottom_toTopOf="@+id/progressDisplay"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:background="@color/black">
+        <TextView
+            android:id="@+id/writtenText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text=""
+            android:textSize="20sp"
+            android:singleLine="true"
+            android:paddingVertical="8dp"
+            android:paddingHorizontal="16dp"
+            android:scrollHorizontally="true"
+            android:ellipsize="none"/>
+    </HorizontalScrollView>
+
     <TextView
         android:id="@+id/progressDisplay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:text="Progress"
-        android:textSize="18sp" />
+        android:text=""
+        android:textSize="18sp"
+        app:layout_constraintBottom_toTopOf="@+id/linearLayout2" />
 
-    <!-- Dot and Line buttons -->
     <LinearLayout
+        android:id="@+id/linearLayout2"
+        style="?android:attr/buttonBarStyle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toTopOf="@+id/buttons">
 
         <Button
             android:id="@+id/dotButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Dot" />
+            android:backgroundTint="@color/black"
+            android:text="@string/dot"
+            android:textColor="@color/white"
+            tools:ignore="ButtonStyle"/>
 
         <Button
             android:id="@+id/lineButton"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Line" />
+            android:backgroundTint="@color/black"
+            android:text="@string/line"
+            android:textColor="@color/white"
+            tools:ignore="ButtonStyle" />
     </LinearLayout>
 
-    <!-- Space and Backspace buttons -->
     <LinearLayout
+        android:id="@+id/buttons"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
 
-        <Button
+        <ImageButton
+            android:id="@+id/shiftButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_marginStart="16dp"
+            android:layout_weight="1"
+            android:backgroundTint="@color/black"
+            android:paddingStart="24dp"
+            android:paddingTop="0dp"
+            android:paddingEnd="0dp"
+            android:paddingBottom="12dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/shift_lower"
+            android:contentDescription="@string/shift_key"
+            android:tint="@color/white" />
+
+        <ImageButton
             android:id="@+id/spaceButton"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
-            android:text="Space" />
+            android:backgroundTint="@color/black"
+            android:contentDescription="@string/space_key"
+            android:src="@drawable/space" />
 
-        <Button
+        <ImageButton
             android:id="@+id/backspaceButton"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="16dp"
             android:layout_weight="1"
-            android:text="Backspace" />
+            android:backgroundTint="@color/black"
+            android:paddingStart="0dp"
+            android:paddingTop="0dp"
+            android:paddingEnd="24dp"
+            android:paddingBottom="12dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/backspace"
+            android:contentDescription="@string/backspace_key"
+            android:tint="@color/white" />
     </LinearLayout>
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

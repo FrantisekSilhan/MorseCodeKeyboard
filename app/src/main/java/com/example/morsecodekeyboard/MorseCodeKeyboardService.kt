@@ -1,54 +1,264 @@
 package com.example.morsecodekeyboard
 
+import android.annotation.SuppressLint
 import android.inputmethodservice.InputMethodService
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.ExtractedTextRequest
 import android.widget.Button
+import android.widget.HorizontalScrollView
+import android.widget.ImageButton
 import android.widget.TextView
 
 class MorseCodeKeyboardService : InputMethodService() {
 
     private var progress = ""
+    private var writtenText = ""
+    private lateinit var writtenTextView: TextView
+    private lateinit var progressDisplayView: TextView
+    private lateinit var shiftButton: ImageButton
+    private lateinit var writtenTextScrollView: HorizontalScrollView
 
+    private val autoPickDelay = 1000L
+    private val handler = Handler(Looper.getMainLooper())
+    private val autoPickRunnable = Runnable {
+        if (progress.isNotEmpty()) {
+            handleInput()
+        }
+    }
+
+    private val backspaceRepeatDelay = 50L
+    private val backspaceInitialDelay = 400L
+    private val backspaceHandler = Handler(Looper.getMainLooper())
+    private var backspaceHeld = false
+
+    private val backspaceRunnable = object : Runnable {
+        override fun run() {
+            resetAutoPickTimer()
+            if (progress.isNotEmpty()) {
+                progress = progress.dropLast(1)
+                progressDisplayView.text = getProgress()
+            } else {
+                shiftText()
+            }
+            if (backspaceHeld) {
+                backspaceHandler.postDelayed(this, backspaceRepeatDelay)
+            }
+        }
+    }
+
+
+    private enum class ShiftType {
+        LOWER,
+        SINGLE,
+        TOGGLED,
+    }
+    private var shiftState: ShiftType = ShiftType.LOWER
+
+    private fun getCharacter(): String {
+        var character = morseCodeMap[progress] ?: ""
+        if (shiftState == ShiftType.LOWER) {
+            character = character.lowercase()
+        }
+        return character
+    }
+
+    private fun getProgress(): String {
+        return getCharacter().plus(" ").plus(progress)
+    }
+
+    private fun updateWrittenTextView() {
+        writtenTextView.text = writtenText
+        writtenTextScrollView.post {
+            writtenTextScrollView.fullScroll(View.FOCUS_RIGHT)
+        }
+    }
+
+    private fun appendText(text: String) {
+        writtenText += text
+        updateWrittenTextView()
+    }
+
+    private fun shiftText() {
+        if (writtenText.isNotEmpty()) {
+            writtenText = writtenText.dropLast(1)
+            updateWrittenTextView()
+        }
+    }
+
+    private fun toggleShift(shiftButton: ImageButton) {
+        shiftState = when (shiftState) {
+            ShiftType.LOWER -> {
+                shiftButton.setImageResource(R.drawable.shift_single)
+                ShiftType.SINGLE
+            }
+            ShiftType.SINGLE -> {
+                shiftButton.setImageResource(R.drawable.shift_toggled)
+                ShiftType.TOGGLED
+            }
+            ShiftType.TOGGLED -> {
+                shiftButton.setImageResource(R.drawable.shift_lower)
+                ShiftType.LOWER
+            }
+        }
+
+        progressDisplayView.text = getProgress()
+    }
+
+    private fun commitWrittenText() {
+        if (writtenText.isNotEmpty()) {
+            val inputConnection = currentInputConnection
+            inputConnection?.let {
+                val text = it.getExtractedText(ExtractedTextRequest(), 0)?.text
+                val length = text?.length ?: 0
+                if (length > 0) {
+                    it.deleteSurroundingText(length, 0)
+                    it.deleteSurroundingText(0, length)
+                }
+            }
+
+            currentInputConnection.commitText(writtenText, 1)
+            writtenText = ""
+            updateWrittenTextView()
+        }
+    }
+
+    private fun resetAutoPickTimer() {
+        handler.removeCallbacks(autoPickRunnable)
+        handler.postDelayed(autoPickRunnable, autoPickDelay)
+    }
+
+    fun onInput() {
+        progressDisplayView.text = getProgress()
+        resetAutoPickTimer()
+    }
+
+    fun handleInput() {
+        when (val character = getCharacter()) {
+            "[space]" -> {
+                appendText(" ")
+            }
+            "[enter]" -> {
+                if (writtenText.isEmpty()) {
+                    progress = ""
+                    progressDisplayView.text = ""
+                    return
+                }
+                commitWrittenText()
+                currentInputConnection.performEditorAction(EditorInfo.IME_ACTION_DONE)
+
+                progress = ""
+                progressDisplayView.text = ""
+                shiftState = ShiftType.LOWER
+                shiftButton.setImageResource(R.drawable.shift_lower)
+            }
+            "[shift]" -> {
+                toggleShift(shiftButton)
+            }
+            "[backspace]" -> {
+                shiftText()
+            }
+            else -> {
+                appendText(character)
+            }
+        }
+
+        progress = ""
+        progressDisplayView.text = ""
+
+        if (shiftState === ShiftType.SINGLE) {
+            shiftState = ShiftType.LOWER
+            shiftButton.setImageResource(R.drawable.shift_lower)
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
     override fun onCreateInputView(): View {
         val keyboardView = LayoutInflater.from(this).inflate(R.layout.keyboard_layout, null)
 
         val dotButton: Button = keyboardView.findViewById(R.id.dotButton)
         val lineButton: Button = keyboardView.findViewById(R.id.lineButton)
-        val spaceButton: Button = keyboardView.findViewById(R.id.spaceButton)
-        val backspaceButton: Button = keyboardView.findViewById(R.id.backspaceButton)
-        val progressDisplay: TextView = keyboardView.findViewById(R.id.progressDisplay)
+        val spaceButton: ImageButton = keyboardView.findViewById(R.id.spaceButton)
+        val backspaceButton: ImageButton = keyboardView.findViewById(R.id.backspaceButton)
+        shiftButton = keyboardView.findViewById(R.id.shiftButton)
+        progressDisplayView = keyboardView.findViewById(R.id.progressDisplay)
+        writtenTextView = keyboardView.findViewById(R.id.writtenText)
+        writtenTextScrollView = keyboardView.findViewById(R.id.writtenTextScrollView)
 
         dotButton.setOnClickListener {
-            progress += "."
-            progressDisplay.text = progress
+            if (progress.length >= 6) {
+                progress = ""
+            } else {
+                progress += "."
+            }
+            onInput()
         }
 
         lineButton.setOnClickListener {
-            progress += "-"
-            progressDisplay.text = progress
+            if (progress.length >= 6) {
+                progress = ""
+            } else {
+                progress += "-"
+            }
+            onInput()
         }
 
         spaceButton.setOnClickListener {
+            resetAutoPickTimer()
             if (progress.isNotEmpty()) {
-                val character = morseCodeMap[progress] ?: ""
-                currentInputConnection.commitText(character, 1)
-                progress = ""
-                progressDisplay.text = ""
+                handleInput()
             } else {
-                currentInputConnection.commitText(" ", 1)
+                appendText(" ")
             }
         }
 
         backspaceButton.setOnClickListener {
+            resetAutoPickTimer()
             if (progress.isNotEmpty()) {
-                progress = ""
-                progressDisplay.text = ""
+                progress = progress.dropLast(1)
+                progressDisplayView.text = getProgress()
             } else {
-                currentInputConnection.deleteSurroundingText(1, 0)
+                shiftText()
             }
         }
 
+        backspaceButton.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.isPressed = true
+                    backspaceHeld = true
+
+                    resetAutoPickTimer()
+                    if (progress.isNotEmpty()) {
+                        progress = progress.dropLast(1)
+                        progressDisplayView.text = getProgress()
+                    } else {
+                        shiftText()
+                    }
+
+                    backspaceHandler.postDelayed(backspaceRunnable, backspaceInitialDelay)
+                    true
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.isPressed = false
+                    backspaceHeld = false
+                    backspaceHandler.removeCallbacks(backspaceRunnable)
+                    true
+                }
+                else -> false
+            }
+        }
+
+        shiftButton.setOnClickListener {
+            toggleShift(shiftButton)
+            resetAutoPickTimer()
+        }
+
+        updateWrittenTextView()
         return keyboardView
     }
 

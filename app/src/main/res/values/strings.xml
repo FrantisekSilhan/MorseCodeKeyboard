@@ -1,3 +1,8 @@
 <resources>
     <string name="app_name">MorseCodeKeyboard</string>
+    <string name="dot">•</string>
+    <string name="line">—</string>
+    <string name="shift_key">Shift key</string>
+    <string name="backspace_key">Backspace key</string>
+    <string name="space_key">Space key</string>
 </resources>
