@@ -75,7 +75,6 @@ class MorseCodeKeyboardService : InputMethodService() {
     private fun updateWrittenTextView() {
         writtenTextScrollView.post {
             writtenTextView.requestFocus()
-            //writtenTextView.bringPointIntoView(writtenTextView.selectionStart)
         }
     }
 
@@ -143,6 +142,7 @@ class MorseCodeKeyboardService : InputMethodService() {
 
             currentInputConnection.commitText(writtenText, 1)
             writtenTextView.setText("")
+            writtenText = ""
             updateWrittenTextView()
         }
     }
@@ -169,12 +169,16 @@ class MorseCodeKeyboardService : InputMethodService() {
                     return
                 }
                 commitWrittenText()
-                currentInputConnection.performEditorAction(EditorInfo.IME_ACTION_DONE)
+                val handled = currentInputConnection.performEditorAction(EditorInfo.IME_ACTION_SEARCH)
+                if (!handled) {
+                    currentInputConnection.performEditorAction(EditorInfo.IME_ACTION_DONE)
+                }
 
                 progress = ""
                 progressDisplayView.text = ""
                 shiftState = ShiftType.LOWER
                 shiftButton.setImageResource(R.drawable.shift_lower)
+                requestHideSelf(0)
             }
             "[shift]" -> {
                 toggleShift(shiftButton)
@@ -281,6 +285,23 @@ class MorseCodeKeyboardService : InputMethodService() {
 
         updateWrittenTextView()
         return keyboardView
+    }
+
+    override fun onFinishInputView(finishingInput: Boolean) {
+        super.onFinishInputView(finishingInput)
+
+        handler.removeCallbacks(autoPickRunnable)
+        backspaceHandler.removeCallbacks(backspaceRunnable)
+
+        progress = ""
+        writtenText = ""
+
+
+        progressDisplayView.text = ""
+        writtenTextView.setText("")
+
+        shiftState = ShiftType.LOWER
+        shiftButton.setImageResource(R.drawable.shift_lower)
     }
 
     private val morseCodeMap = mapOf(
