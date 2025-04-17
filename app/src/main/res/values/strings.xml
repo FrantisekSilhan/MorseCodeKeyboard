@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">MorseCodeKeyboard</string>
+    <string name="app_name">Morse Code Keyboard</string>
     <string name="dot">•</string>
     <string name="line">—</string>
     <string name="shift_key">Shift key</string>
