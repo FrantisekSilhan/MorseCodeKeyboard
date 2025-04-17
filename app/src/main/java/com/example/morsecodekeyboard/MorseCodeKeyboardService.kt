@@ -14,23 +14,16 @@ import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.TextView
+import com.example.morsecodekeyboard.data.MorseCodeMap
+import com.example.morsecodekeyboard.handlers.MorseInputHandler
 
 class MorseCodeKeyboardService : InputMethodService() {
 
-    private var progress = ""
-    private var writtenText = ""
+    private lateinit var inputHandler: MorseInputHandler
     private lateinit var writtenTextView: EditText
     private lateinit var progressDisplayView: TextView
     private lateinit var shiftButton: ImageButton
     private lateinit var writtenTextScrollView: HorizontalScrollView
-
-    private val autoPickDelay = 1000L
-    private val handler = Handler(Looper.getMainLooper())
-    private val autoPickRunnable = Runnable {
-        if (progress.isNotEmpty()) {
-            handleInput()
-        }
-    }
 
     private val backspaceRepeatDelay = 50L
     private val backspaceInitialDelay = 400L
@@ -39,164 +32,16 @@ class MorseCodeKeyboardService : InputMethodService() {
 
     private val backspaceRunnable = object : Runnable {
         override fun run() {
-            resetAutoPickTimer()
-            if (progress.isNotEmpty()) {
-                progress = progress.dropLast(1)
-                progressDisplayView.text = getProgress()
+            inputHandler.resetAutoPickTimer()
+            if (inputHandler.progress.isNotEmpty()) {
+                inputHandler.progress = inputHandler.progress.dropLast(1)
+                progressDisplayView.text = inputHandler.getCurrentProgress()
             } else {
-                shiftText()
+                inputHandler.shiftText()
             }
             if (backspaceHeld) {
                 backspaceHandler.postDelayed(this, backspaceRepeatDelay)
             }
-        }
-    }
-
-
-    private enum class ShiftType {
-        LOWER,
-        SINGLE,
-        TOGGLED,
-    }
-    private var shiftState: ShiftType = ShiftType.LOWER
-
-    private fun getCharacter(): String {
-        var character = morseCodeMap[progress] ?: ""
-        if (shiftState == ShiftType.LOWER) {
-            character = character.lowercase()
-        }
-        return character
-    }
-
-    private fun getProgress(): String {
-        return getCharacter().plus(" ").plus(progress)
-    }
-
-    private fun updateWrittenTextView() {
-        writtenTextScrollView.post {
-            writtenTextView.requestFocus()
-        }
-    }
-
-    private fun appendText(text: String) {
-        val start = writtenTextView.selectionStart
-        val end = writtenTextView.selectionEnd
-        writtenTextView.text.replace(
-            start.coerceAtMost(end),
-            start.coerceAtLeast(end),
-            text,
-            0,
-            text.length
-        )
-
-        val newCursor = start.coerceAtMost(end) + text.length
-        writtenTextView.setSelection(newCursor)
-        writtenText = writtenTextView.text.toString()
-        updateWrittenTextView()
-    }
-
-    private fun shiftText() {
-        val start = writtenTextView.selectionStart
-        val end = writtenTextView.selectionEnd
-        if (start != end) {
-            writtenTextView.text.delete(start, end)
-            writtenTextView.setSelection(start)
-        } else if (start > 0) {
-            writtenTextView.text.delete(start - 1, start)
-            writtenTextView.setSelection(start - 1)
-        }
-        writtenText = writtenTextView.text.toString()
-        updateWrittenTextView()
-    }
-
-    private fun toggleShift(shiftButton: ImageButton) {
-        shiftState = when (shiftState) {
-            ShiftType.LOWER -> {
-                shiftButton.setImageResource(R.drawable.shift_single)
-                ShiftType.SINGLE
-            }
-            ShiftType.SINGLE -> {
-                shiftButton.setImageResource(R.drawable.shift_toggled)
-                ShiftType.TOGGLED
-            }
-            ShiftType.TOGGLED -> {
-                shiftButton.setImageResource(R.drawable.shift_lower)
-                ShiftType.LOWER
-            }
-        }
-
-        progressDisplayView.text = getProgress()
-    }
-
-    private fun commitWrittenText() {
-        if (writtenText.isNotEmpty()) {
-            val inputConnection = currentInputConnection
-            inputConnection?.let {
-                val text = it.getExtractedText(ExtractedTextRequest(), 0)?.text
-                val length = text?.length ?: 0
-                if (length > 0) {
-                    it.deleteSurroundingText(length, 0)
-                    it.deleteSurroundingText(0, length)
-                }
-            }
-
-            currentInputConnection.commitText(writtenText, 1)
-            writtenTextView.setText("")
-            writtenText = ""
-            updateWrittenTextView()
-        }
-    }
-
-    private fun resetAutoPickTimer() {
-        handler.removeCallbacks(autoPickRunnable)
-        handler.postDelayed(autoPickRunnable, autoPickDelay)
-    }
-
-    fun onInput() {
-        progressDisplayView.text = getProgress()
-        resetAutoPickTimer()
-    }
-
-    fun handleInput() {
-        when (val character = getCharacter()) {
-            "[space]" -> {
-                appendText(" ")
-            }
-            "[enter]" -> {
-                if (writtenText.isEmpty()) {
-                    progress = ""
-                    progressDisplayView.text = ""
-                    return
-                }
-                commitWrittenText()
-                val handled = currentInputConnection.performEditorAction(EditorInfo.IME_ACTION_SEARCH)
-                if (!handled) {
-                    currentInputConnection.performEditorAction(EditorInfo.IME_ACTION_DONE)
-                }
-
-                progress = ""
-                progressDisplayView.text = ""
-                shiftState = ShiftType.LOWER
-                shiftButton.setImageResource(R.drawable.shift_lower)
-                requestHideSelf(0)
-            }
-            "[shift]" -> {
-                toggleShift(shiftButton)
-            }
-            "[backspace]" -> {
-                shiftText()
-            }
-            else -> {
-                appendText(character)
-            }
-        }
-
-        progress = ""
-        progressDisplayView.text = ""
-
-        if (shiftState === ShiftType.SINGLE) {
-            shiftState = ShiftType.LOWER
-            shiftButton.setImageResource(R.drawable.shift_lower)
         }
     }
 
@@ -214,40 +59,68 @@ class MorseCodeKeyboardService : InputMethodService() {
         writtenTextScrollView = keyboardView.findViewById(R.id.writtenTextScrollView)
         writtenTextView.requestFocus()
 
+        inputHandler = MorseInputHandler(
+            MorseCodeMap.map,
+            writtenTextView,
+            progressDisplayView,
+            shiftButton,
+            writtenTextScrollView,
+            onCommit = { text ->
+                val inputConnection = currentInputConnection
+                inputConnection?.let {
+                    val extracted = it.getExtractedText(ExtractedTextRequest(), 0)?.text
+                    val length = extracted?.length ?: 0
+                    if (length > 0) {
+                        it.deleteSurroundingText(length, 0)
+                        it.deleteSurroundingText(0, length)
+                    }
+                }
+                currentInputConnection.commitText(text, 1)
+            },
+            onHideKeyboard = {
+                val handled = currentInputConnection.performEditorAction(EditorInfo.IME_ACTION_SEARCH)
+                if (!handled) {
+                    currentInputConnection.performEditorAction(EditorInfo.IME_ACTION_DONE)
+                }
+                requestHideSelf(0)
+            },
+            onShiftStateChanged = { }
+        )
+
         dotButton.setOnClickListener {
-            if (progress.length >= 6) {
-                progress = ""
+            if (inputHandler.progress.length >= 6) {
+                inputHandler.progress = ""
             } else {
-                progress += "."
+                inputHandler.progress += "."
             }
-            onInput()
+            inputHandler.onInput()
         }
 
         lineButton.setOnClickListener {
-            if (progress.length >= 6) {
-                progress = ""
+            if (inputHandler.progress.length >= 6) {
+                inputHandler.progress = ""
             } else {
-                progress += "-"
+                inputHandler.progress += "-"
             }
-            onInput()
+            inputHandler.onInput()
         }
 
         spaceButton.setOnClickListener {
-            resetAutoPickTimer()
-            if (progress.isNotEmpty()) {
-                handleInput()
+            inputHandler.resetAutoPickTimer()
+            if (inputHandler.progress.isNotEmpty()) {
+                inputHandler.handleInput()
             } else {
-                appendText(" ")
+                inputHandler.appendText(" ")
             }
         }
 
         backspaceButton.setOnClickListener {
-            resetAutoPickTimer()
-            if (progress.isNotEmpty()) {
-                progress = progress.dropLast(1)
-                progressDisplayView.text = getProgress()
+            inputHandler.resetAutoPickTimer()
+            if (inputHandler.progress.isNotEmpty()) {
+                inputHandler.progress = inputHandler.progress.dropLast(1)
+                progressDisplayView.text = inputHandler.getCurrentProgress()
             } else {
-                shiftText()
+                inputHandler.shiftText()
             }
         }
 
@@ -257,12 +130,12 @@ class MorseCodeKeyboardService : InputMethodService() {
                     v.isPressed = true
                     backspaceHeld = true
 
-                    resetAutoPickTimer()
-                    if (progress.isNotEmpty()) {
-                        progress = progress.dropLast(1)
-                        progressDisplayView.text = getProgress()
+                    inputHandler.resetAutoPickTimer()
+                    if (inputHandler.progress.isNotEmpty()) {
+                        inputHandler.progress = inputHandler.progress.dropLast(1)
+                        progressDisplayView.text = inputHandler.getCurrentProgress()
                     } else {
-                        shiftText()
+                        inputHandler.shiftText()
                     }
 
                     backspaceHandler.postDelayed(backspaceRunnable, backspaceInitialDelay)
@@ -279,103 +152,17 @@ class MorseCodeKeyboardService : InputMethodService() {
         }
 
         shiftButton.setOnClickListener {
-            toggleShift(shiftButton)
-            resetAutoPickTimer()
+            inputHandler.toggleShift()
+            inputHandler.resetAutoPickTimer()
         }
 
-        updateWrittenTextView()
+        inputHandler.updateWrittenTextView()
         return keyboardView
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
-
-        handler.removeCallbacks(autoPickRunnable)
         backspaceHandler.removeCallbacks(backspaceRunnable)
-
-        progress = ""
-        writtenText = ""
-
-
-        progressDisplayView.text = ""
-        writtenTextView.setText("")
-
-        shiftState = ShiftType.LOWER
-        shiftButton.setImageResource(R.drawable.shift_lower)
+        inputHandler.clear()
     }
-
-    private val morseCodeMap = mapOf(
-        ".-" to "A",
-        "-..." to "B",
-        "-.-." to "C",
-        "-.." to "D",
-        "." to "E",
-        "..-." to "F",
-        "--." to "G",
-        "...." to "H",
-        ".." to "I",
-        ".---" to "J",
-        "-.-" to "K",
-        ".-.." to "L",
-        "--" to "M",
-        "-." to "N",
-        "---" to "O",
-        ".--." to "P",
-        "--.-" to "Q",
-        ".-." to "R",
-        "..." to "S",
-        "-" to "T",
-        "..-" to "U",
-        "...-" to "V",
-        ".--" to "W",
-        "-..-" to "X",
-        "-.--" to "Y",
-        "--.." to "Z",
-        ".----" to "1",
-        "..---" to "2",
-        "...--" to "3",
-        "....-" to "4",
-        "....." to "5",
-        "-...." to "6",
-        "--..." to "7",
-        "---.." to "8",
-        "----." to "9",
-        "-----" to "0",
-        ".-.-.-" to ".",
-        "--..--" to ",",
-        "..--.." to "?",
-        ".----." to "'",
-        "-.-.--" to "!",
-        "-..-." to "/",
-        "-.--." to "(",
-        "-.--.-" to ")",
-        ".-..." to "&",
-        "---..." to ":",
-        "-.-.-." to ";",
-        "-...-" to "=",
-        ".-.-." to "+",
-        "-....-" to "-",
-        "..--.-" to "_",
-        ".--.-." to "@",
-        ".-..-." to "\"",
-        "...-." to "*",
-        "-.-.-" to "\\",
-        "---.-" to "%",
-        "--.-." to "#",
-        "--.-.-" to "|",
-        "......" to "^",
-        ".---.." to "~",
-        "-..-.-" to "`",
-        "...-.." to "$",
-        ".--.." to "[",
-        ".--..-" to "]",
-        ".--.-" to "{",
-        ".--.--" to "}",
-        "-.---" to "<",
-        "-.----" to ">",
-        "..--" to "[space]",
-        ".-.-" to "[enter]",
-        "....-." to "[shift]",
-        "----" to "[backspace]",
-    )
 }
