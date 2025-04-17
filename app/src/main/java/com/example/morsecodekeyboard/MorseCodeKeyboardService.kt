@@ -10,6 +10,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
 import android.widget.Button
+import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.ImageButton
 import android.widget.TextView
@@ -18,7 +19,7 @@ class MorseCodeKeyboardService : InputMethodService() {
 
     private var progress = ""
     private var writtenText = ""
-    private lateinit var writtenTextView: TextView
+    private lateinit var writtenTextView: EditText
     private lateinit var progressDisplayView: TextView
     private lateinit var shiftButton: ImageButton
     private lateinit var writtenTextScrollView: HorizontalScrollView
@@ -72,22 +73,41 @@ class MorseCodeKeyboardService : InputMethodService() {
     }
 
     private fun updateWrittenTextView() {
-        writtenTextView.text = writtenText
         writtenTextScrollView.post {
-            writtenTextScrollView.fullScroll(View.FOCUS_RIGHT)
+            writtenTextView.requestFocus()
+            //writtenTextView.bringPointIntoView(writtenTextView.selectionStart)
         }
     }
 
     private fun appendText(text: String) {
-        writtenText += text
+        val start = writtenTextView.selectionStart
+        val end = writtenTextView.selectionEnd
+        writtenTextView.text.replace(
+            start.coerceAtMost(end),
+            start.coerceAtLeast(end),
+            text,
+            0,
+            text.length
+        )
+
+        val newCursor = start.coerceAtMost(end) + text.length
+        writtenTextView.setSelection(newCursor)
+        writtenText = writtenTextView.text.toString()
         updateWrittenTextView()
     }
 
     private fun shiftText() {
-        if (writtenText.isNotEmpty()) {
-            writtenText = writtenText.dropLast(1)
-            updateWrittenTextView()
+        val start = writtenTextView.selectionStart
+        val end = writtenTextView.selectionEnd
+        if (start != end) {
+            writtenTextView.text.delete(start, end)
+            writtenTextView.setSelection(start)
+        } else if (start > 0) {
+            writtenTextView.text.delete(start - 1, start)
+            writtenTextView.setSelection(start - 1)
         }
+        writtenText = writtenTextView.text.toString()
+        updateWrittenTextView()
     }
 
     private fun toggleShift(shiftButton: ImageButton) {
@@ -122,7 +142,7 @@ class MorseCodeKeyboardService : InputMethodService() {
             }
 
             currentInputConnection.commitText(writtenText, 1)
-            writtenText = ""
+            writtenTextView.setText("")
             updateWrittenTextView()
         }
     }
@@ -188,6 +208,7 @@ class MorseCodeKeyboardService : InputMethodService() {
         progressDisplayView = keyboardView.findViewById(R.id.progressDisplay)
         writtenTextView = keyboardView.findViewById(R.id.writtenText)
         writtenTextScrollView = keyboardView.findViewById(R.id.writtenTextScrollView)
+        writtenTextView.requestFocus()
 
         dotButton.setOnClickListener {
             if (progress.length >= 6) {

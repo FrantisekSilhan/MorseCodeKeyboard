@@ -8,29 +8,44 @@
     android:orientation="vertical"
     android:padding="0dp">
 
-    <HorizontalScrollView
-        android:id="@+id/writtenTextScrollView"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:scrollbars="none"
-        android:layout_marginHorizontal="0dp"
         app:layout_constraintBottom_toTopOf="@+id/progressDisplay"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        android:paddingStart="0dp"
+        android:paddingEnd="16dp"
         android:background="@color/black">
-        <TextView
-            android:id="@+id/writtenText"
-            android:layout_width="wrap_content"
+        <HorizontalScrollView
+            android:id="@+id/writtenTextScrollView"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center"
-            android:text=""
-            android:textSize="20sp"
-            android:singleLine="true"
-            android:paddingVertical="8dp"
-            android:paddingHorizontal="16dp"
-            android:scrollHorizontally="true"
-            android:ellipsize="none"/>
-    </HorizontalScrollView>
+            android:scrollbars="none"
+            android:background="@color/black">
+            <EditText
+                android:id="@+id/writtenText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:text=""
+                android:textSize="20sp"
+                android:singleLine="true"
+                android:paddingVertical="8dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:scrollHorizontally="true"
+                android:background="@android:color/transparent"
+                android:ellipsize="none"
+                android:textCursorDrawable="@null"
+                android:cursorVisible="true"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:inputType="textVisiblePassword"
+                android:hint="@null"
+                android:autofillHints="false"/>
+        </HorizontalScrollView>
+    </LinearLayout>
 
     <TextView
         android:id="@+id/progressDisplay"
