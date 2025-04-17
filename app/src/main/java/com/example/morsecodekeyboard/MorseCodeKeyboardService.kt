@@ -196,7 +196,7 @@ class MorseCodeKeyboardService : InputMethodService() {
         }
     }
 
-    @SuppressLint("ClickableViewAccessibility")
+    @SuppressLint("ClickableViewAccessibility", "InflateParams")
     override fun onCreateInputView(): View {
         val keyboardView = LayoutInflater.from(this).inflate(R.layout.keyboard_layout, null)
 
